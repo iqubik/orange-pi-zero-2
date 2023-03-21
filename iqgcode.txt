@@ -1,0 +1,76 @@
+#paste all to printer.cfg
+
+[respond]
+default_type: echo
+default_prefix: macro: 
+
+[gcode_macro TEMP_MAP_MESH]
+#test bed for some temps
+gcode:    
+    RESPOND MSG="Start making bed_mesh_temp... Wait a lot of time..."
+    {% set Start = params.Start|default(40)|int %} ;default start temp
+    {% set End = params.End|default(100)|int %} ;default end temp
+    {% set Step = params.Step|default(5)|int %} ;default step
+    {% set tested_temps = range(Start, End + Step, Step) %} ;list of tested temperatures
+    SET_PIN PIN=BedFan VALUE=0 ;custom fan off
+# working cycle
+    {% for Temp in tested_temps %}
+        G28 ;go home
+        M190 S{Temp} ;wait for bed is heated
+        BED_MESH_PROFILE SAVE={Temp} ;Create a profile for the current temperature        
+        BED_MESH_PROFILE LOAD={Temp} ;load a profile
+        BED_MESH_CALIBRATE ;Perform bed mesh calibration
+        BED_MESH_PROFILE SAVE={Temp} ;Save the bed mesh profile with the current temperature        
+    {% endfor %}
+    #build default 60 profile
+    G28 ;go home
+    RESPOND MSG="Default profile 60C is waiting for calibrate..."
+    M190 S60 ;60C for default profile calibrate
+    BED_MESH_PROFILE SAVE=default ;Create a profile for the current temperature
+    BED_MESH_PROFILE LOAD=default ;Create a profile for the current temperature
+    BED_MESH_CALIBRATE ;Perform bed mesh calibration
+    BED_MESH_PROFILE SAVE=default ;Save the bed mesh profile with the current temperature        
+    RESPOND MSG="Calibration of bed_mesh_temp is complete! Save you settings."
+    SAVE_CONFIG ;Save the configuration
+
+[gcode_macro START_PRINT]
+#cura start code:
+#START_PRINT EXTRUDER_TEMP={material_print_temperature_layer_0} BED_TEMP={material_bed_temperature_layer_0}
+#prusa start code:
+#START_PRINT EXTRUDER_TEMP=[first_layer_temperature] BED_TEMP=[first_layer_bed_temperature]
+variable_retract: 5
+gcode:
+    {% set extruder_temp = params.EXTRUDER_TEMP|default(225)|float %}
+    {% set bed_temp = params.BED_TEMP|default(70)|float %}
+    {% set E = printer["gcode_macro START_PRINT"].retract|float %}
+    CLEAR_PAUSE
+    G28
+    SET_HEATER_TEMPERATURE HEATER=heater_bed TARGET={bed_temp}                  # set bed t℃
+    RESPOND MSG="Heating..."
+    TEMPERATURE_WAIT SENSOR=heater_bed MINIMUM={bed_temp * 0.75}                # wait until bed is partially heated
+    SET_HEATER_TEMPERATURE HEATER=extruder TARGET={extruder_temp}               # set nozzle t℃
+    TEMPERATURE_WAIT SENSOR=heater_bed MINIMUM={bed_temp}                       # wait until
+    TEMPERATURE_WAIT SENSOR=extruder MINIMUM={extruder_temp}                    # wait until
+    M300
+    SET_LED_EFFECT EFFECT=bed_effects STOP=1 FADETIME=.5 ;my custom leds
+    SET_LED_EFFECT EFFECT=led_idle STOP=1 FADETIME=.5
+    SET_LED_EFFECT EFFECT=progress_bar START=1 FADETIME=.5
+    # код вырора профиля по температуре стола
+    {% set bed_profiles = printer['bed_mesh']['profiles'].keys() %}
+    {% set profile_list = [] %}
+    {% for profile in bed_profiles %}
+        {% set profile_int = profile | int %}
+        {% set _ = profile_list.append(profile_int) %}        
+    {% endfor %}    
+    RESPOND MSG="Founded Bed_Mesh: {profile_list}"
+    {% if bed_temp in profile_list %}        
+        {% set answer = bed_temp | int %}        
+		BED_MESH_PROFILE LOAD={answer}
+		RESPOND MSG="Existing Bed_Mesh as: {answer}"
+    {% else %}		
+	    BED_MESH_PROFILE LOAD=default
+	    RESPOND MSG="Default Bed_Mesh loaded"
+	{% endif %}
+    #BED_MESH_PROFILE LOAD=default
+#move head
+    RESPOND MSG="PrePrint is started..."
