@@ -5,10 +5,10 @@ default_prefix: macro:
 [gcode_macro TEMP_MAP_MESH]
 #test bed for some temps
 gcode:    
-    {% set Start = 45 | int %}
-    {% set End = 55 | int %}
+    {% set Start = 60 | int %}
+    {% set End = 90 | int %}
     {% set Step = 5 | int %}
-    RESPOND MSG="Start bed_mesh_temp: {Start} - {End} with step {Step} . Wait a time..."
+    RESPOND MSG="Start bed_mesh_temp: {Start} - {End} with step {Step}. Wait a time..."
     {% set tested_temps = range(Start, End + Step, Step) %} ;list of tested temperatures
     SET_PIN PIN=BedFan VALUE=0 ;custom fan off
 # working cycle
@@ -22,23 +22,26 @@ gcode:
     #build default 60 profile
     G28 ;go home
     RESPOND MSG="Default profile 60C is waiting for calibrate..."
-    M190 S60 ;60C for default profile calibrate
+    
+    #custom default    
+    M190 S80 ;80C for default profile calibrate
+    
     BED_MESH_PROFILE SAVE=default ;Create a profile for the current temperature    
     BED_MESH_CALIBRATE ;Perform bed mesh calibration
     BED_MESH_PROFILE SAVE=default ;Save the bed mesh profile with the current temperature        
     RESPOND MSG="Calibration of bed_mesh_temp is complete! Save you settings."
-    SAVE_CONFIG ;Save the configuration
+    M190 S0 ;clear command
 
 [gcode_macro START_PRINT]
 #cura start code:
 #START_PRINT EXTRUDER_TEMP={material_print_temperature_layer_0} BED_TEMP={material_bed_temperature_layer_0}
 #prusa start code:
 #START_PRINT EXTRUDER_TEMP=[first_layer_temperature] BED_TEMP=[first_layer_bed_temperature]
-variable_retract: 5
+#variable_retract: 5
 gcode:
     {% set extruder_temp = params.EXTRUDER_TEMP|default(225)|float %}
     {% set bed_temp = params.BED_TEMP|default(70)|float %}
-    {% set E = printer["gcode_macro START_PRINT"].retract|float %}
+#   {% set E = printer["gcode_macro START_PRINT"].retract|float %}
     CLEAR_PAUSE
     G28
     SET_HEATER_TEMPERATURE HEATER=heater_bed TARGET={bed_temp}                  # set bed t℃
@@ -48,9 +51,6 @@ gcode:
     TEMPERATURE_WAIT SENSOR=heater_bed MINIMUM={bed_temp}                       # wait until
     TEMPERATURE_WAIT SENSOR=extruder MINIMUM={extruder_temp}                    # wait until
     M300
-    SET_LED_EFFECT EFFECT=bed_effects STOP=1 FADETIME=.5 ;my custom leds
-    SET_LED_EFFECT EFFECT=led_idle STOP=1 FADETIME=.5
-    SET_LED_EFFECT EFFECT=progress_bar START=1 FADETIME=.5
     # код вырора профиля по температуре стола
     {% set bed_profiles = printer['bed_mesh']['profiles'].keys() %}
     {% set profile_list = [] %}
@@ -67,23 +67,6 @@ gcode:
 	    BED_MESH_PROFILE LOAD=default
 	    RESPOND MSG="Default Bed_Mesh loaded"
 	{% endif %}
-    #BED_MESH_PROFILE LOAD=default
+    #BED_MESH_PROFILE LOAD=default ; why not?
 #move head
     RESPOND MSG="PrePrint is started..."
-    M82 ;absolute extrusion mode
-    G21
-    G90
-    M82
-    M107 T0 ;fan off
-    G28
-    G92 E0
-    M106 S100 ; Enable cooling fan
-    G1 X-98 Y0 Z0.4 F3000 ; move to arc start
-    G3 X0 Y-98 I98 Z0.4 E40 F1000 ; lay arc stripe 90deg
-    G92 E0 ; reset extrusion distance
-    G4 P500 ; wait for 0.5 sec
-    M107 ; Disable cooling fan
-    G10
-    G1 X0 Y0 Z1 F4000 ; get off the bed
-    G10
-    RESPOND MSG="Now printing you slicer GCODE..."
