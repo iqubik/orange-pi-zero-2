@@ -5,16 +5,10 @@ default_prefix: macro:
 [gcode_macro TEMP_MAP_MESH]
 #test bed for some temps
 gcode:    
-    RESPOND MSG="Start making bed_mesh_temp. Wait a lot of time..."
-    {% set Startf = params.Start|default(40)| float %} ;default start temp
-    {% set Start = Startf | int %}
-
-    {% set Endf = params.End|default(100)| float %} ;default end temp
-    {% set End = Endf | int %}
-
-    {% set Stepf = params.Step|default(5)| float %} ;default step
-    {% set Step = Stepf | int %}
-
+    {% set Start = 45 | int %}
+    {% set End = 55 | int %}
+    {% set Step = 5 | int %}
+    RESPOND MSG="Start bed_mesh_temp: {Start} - {End} with step {Step} . Wait a time..."
     {% set tested_temps = range(Start, End + Step, Step) %} ;list of tested temperatures
     SET_PIN PIN=BedFan VALUE=0 ;custom fan off
 # working cycle
@@ -76,3 +70,20 @@ gcode:
     #BED_MESH_PROFILE LOAD=default
 #move head
     RESPOND MSG="PrePrint is started..."
+    M82 ;absolute extrusion mode
+    G21
+    G90
+    M82
+    M107 T0 ;fan off
+    G28
+    G92 E0
+    M106 S100 ; Enable cooling fan
+    G1 X-98 Y0 Z0.4 F3000 ; move to arc start
+    G3 X0 Y-98 I98 Z0.4 E40 F1000 ; lay arc stripe 90deg
+    G92 E0 ; reset extrusion distance
+    G4 P500 ; wait for 0.5 sec
+    M107 ; Disable cooling fan
+    G10
+    G1 X0 Y0 Z1 F4000 ; get off the bed
+    G10
+    RESPOND MSG="Now printing you slicer GCODE..."
