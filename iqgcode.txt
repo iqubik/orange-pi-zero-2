@@ -1,5 +1,3 @@
-#paste all to printer.cfg
-
 [respond]
 default_type: echo
 default_prefix: macro: 
@@ -7,18 +5,23 @@ default_prefix: macro:
 [gcode_macro TEMP_MAP_MESH]
 #test bed for some temps
 gcode:    
-    RESPOND MSG="Start making bed_mesh_temp... Wait a lot of time..."
-    {% set Start = params.Start|default(40)|int %} ;default start temp
-    {% set End = params.End|default(100)|int %} ;default end temp
-    {% set Step = params.Step|default(5)|int %} ;default step
+    RESPOND MSG="Start making bed_mesh_temp. Wait a lot of time..."
+    {% set Startf = params.Start|default(40)| float %} ;default start temp
+    {% set Start = Startf | int %}
+
+    {% set Endf = params.End|default(100)| float %} ;default end temp
+    {% set End = Endf | int %}
+
+    {% set Stepf = params.Step|default(5)| float %} ;default step
+    {% set Step = Stepf | int %}
+
     {% set tested_temps = range(Start, End + Step, Step) %} ;list of tested temperatures
     SET_PIN PIN=BedFan VALUE=0 ;custom fan off
 # working cycle
     {% for Temp in tested_temps %}
         G28 ;go home
         M190 S{Temp} ;wait for bed is heated
-        BED_MESH_PROFILE SAVE={Temp} ;Create a profile for the current temperature        
-        BED_MESH_PROFILE LOAD={Temp} ;load a profile
+        BED_MESH_PROFILE SAVE={Temp} ;Create a profile for the current temperature                
         BED_MESH_CALIBRATE ;Perform bed mesh calibration
         BED_MESH_PROFILE SAVE={Temp} ;Save the bed mesh profile with the current temperature        
     {% endfor %}
@@ -26,8 +29,7 @@ gcode:
     G28 ;go home
     RESPOND MSG="Default profile 60C is waiting for calibrate..."
     M190 S60 ;60C for default profile calibrate
-    BED_MESH_PROFILE SAVE=default ;Create a profile for the current temperature
-    BED_MESH_PROFILE LOAD=default ;Create a profile for the current temperature
+    BED_MESH_PROFILE SAVE=default ;Create a profile for the current temperature    
     BED_MESH_CALIBRATE ;Perform bed mesh calibration
     BED_MESH_PROFILE SAVE=default ;Save the bed mesh profile with the current temperature        
     RESPOND MSG="Calibration of bed_mesh_temp is complete! Save you settings."
